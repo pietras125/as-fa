@@ -1,0 +1,74 @@
+import time 
+import requests
+import os
+from selenium import webdriver 
+from selenium.webdriver import Chrome 
+from selenium.webdriver.chrome.service import Service 
+from selenium.webdriver.common.by import By 
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+import datetime
+
+class SprawdzajStrone():
+    def sprawdz_strone(self, link):
+        print(datetime.datetime.now().strftime('%Y.%m.%d %H:%M:%S') + " Sprawdzam AMAZON.ES") 
+        options = Options()
+        chromeOptions = webdriver.ChromeOptions() 
+        options.add_argument("--remote-debugging-port=9222")  # this
+        options.BinaryLocation = "/usr/bin/chromium-browser"
+        driver_path = "/usr/bin/chromedriver"
+        options.add_argument('--headless')
+        self.driver = webdriver.Chrome(options=options, service=Service(driver_path))
+        self.driver.get(link) 
+        artykuly = WebDriverWait(self.driver,10).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".a-section.a-spacing-small.puis-padding-left-small.puis-padding-right-small")))
+        for artykul in artykuly:
+            nazwa_artykulu = ''
+            cena_artykulu = 0
+            link_artykulu = ''
+            #pobierz nazwę
+            nazwa = artykul.find_element(By.CSS_SELECTOR, ".a-link-normal.s-underline-text.s-underline-link-text.s-link-style.a-text-normal")
+            nazwa_artykulu = nazwa.text
+            #pobierz cenę
+            cena_lista = artykul.find_elements(By.CLASS_NAME, "a-color-base")
+            for cena_szukaj in cena_lista:
+                if cena_szukaj.text.find("€") != -1: 
+                    cena_artykulu_surowa = cena_szukaj.text.split(",")[0]
+                    if cena_artykulu_surowa.find(".") != -1:
+                        cena_artykulu = int(cena_artykulu_surowa.replace(".",""))
+                    else:
+                        cena_artykulu = int(cena_artykulu_surowa)
+            #pobierz link
+            linki_artykulu = artykul.find_element(By.CSS_SELECTOR, ".a-link-normal.s-underline-text.s-underline-link-text.s-link-style.a-text-normal")
+            link_artykulu = linki_artykulu.get_attribute('href')
+            #sprawdź czy jest artykuł tańszy niż...
+            if cena_artykulu < 300 and cena_artykulu != 0:
+                wiadomosc = str(cena_artykulu) + "\n\n" + nazwa_artykulu + "\n" + link_artykulu 
+                self.wyslij_powiadomienie(wiadomosc)
+                print(datetime.datetime.now().strftime('%Y.%m.%d %H:%M:%S') + str(cena_artykulu) + "\n" + nazwa_artykulu + "\n" + link_artykulu)
+        self.driver.close()
+        self.driver.quit()
+    
+    def wyslij_powiadomienie(self, tekst):
+        self.url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={CHAT_ID}&text={tekst}"
+        print(requests.get(self.url).json())
+    
+if __name__ == '__main__':
+    TOKEN = "5816344668:AAGgs9IK0iAiWG603pwetbOSdCPxL6zsia8"
+    CHAT_ID = "5526684558"
+    sprawdzajStrone = SprawdzajStrone()
+
+    while True:
+        try:
+            sprawdzajStrone.sprawdz_strone("https://www.amazon.it/s?i=computers&bbn=3581999031&rh=n%3A3581999031%2Cn%3A425916031%2Cn%3A460158031%2Cp_n_feature_twenty_browse-bin%3A27387474031&s=price-asc-rank&dc&ds=v1%3AOkaxbcjrfRN8Yvn88TKV0pl2v1qd1DSKzesCuYUC6AQ&qid=1678980712&rnid=27387470031&ref=sr_st_price-asc-rank" )
+            time.sleep(60)
+        except Exception as e:
+            sprawdzajStrone.wyslij_powiadomienie("Program wywalony\n" + str(e) + "\n" + repr(e))
+            print(datetime.datetime.now().strftime('%Y.%m.%d %H:%M:%S') + " Program wywalony\n" + str(e) + "\n" + repr(e)) 
+            time.sleep(60)
+            #break
+        
+        
+
